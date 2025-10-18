@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
@@ -28,55 +30,52 @@ app.get("/api/events", async (req, res) => {
 
 app.post("/api/events", async (req, res) => {
   const { name, type_id, event_date, start_time, end_time, location, description } = req.body;
-
   const { data, error } = await supabase
     .from("events")
     .insert([{ name, type_id, event_date, start_time, end_time, location, description }])
     .select()
     .single();
-
   if (error) return res.status(400).json({ error });
   res.json(data);
 });
 
 app.get("/api/students", async (req, res) => {
-  const { data, error } = await supabase.from("students").select("*").order("name");
+  const { data, error } = await supabase.from("participants").select("*").order("name");
   if (error) return res.status(400).json({ error });
   res.json(data);
 });
 
 app.post("/api/attendance", async (req, res) => {
   const { student_id, event_id, status, notes } = req.body;
-
   const { data, error } = await supabase
     .from("attendance")
-    .upsert({ student_id, event_id, status, notes }, { onConflict: "student_id,event_id" })
+    .upsert({ participant_id, event_id, status, notes }, { onConflict: "participant_id,event_id" })
     .select()
     .single();
-
   if (error) return res.status(400).json({ error });
   res.json(data);
 });
 
 app.get("/api/attendance/:event_id", async (req, res) => {
   const { event_id } = req.params;
-
   const { data, error } = await supabase
     .from("attendance")
-    .select("status, notes, students(name)")
+    .select("status, notes, participants(name)")
     .eq("event_id", event_id);
-
   if (error) return res.status(400).json({ error });
-
   res.json(data.map(a => ({
-    student: a.students.name,
+    student: a.participants.name,
     status: a.status,
     notes: a.notes
   })));
 });
 
-app.get("/", (req, res) => {
-  res.send("🎸 Tabaleres API is running!");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
 });
 
 const PORT = process.env.PORT || 8080;
